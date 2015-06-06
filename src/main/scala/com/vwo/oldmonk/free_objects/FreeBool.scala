@@ -1,13 +1,14 @@
 package com.vwo.oldmonk.free_objects
 
-import spire.algebra.{Order => SpireOrder, _}
 import scalaz._
 import Scalaz._
 import com.vwo.oldmonk.datastructures.CovariantSet
+import spire.algebra.{Order => SpireOrder, _}
+import spire.implicits._
 
-trait FreeBoolAlgebra[F[_]] {
+trait FreeBoolAlgebra[F[_]] extends Functor[F] with Monad[F] {
   // A Free Boolean Algebra has a Bool[P]
-  def bool[A]: Bool[F[A]]
+  implicit def bool[A]: Bool[F[A]]
 
   /* For any function f: A => B, B a boolean algebra, there exists a natural homomorphism
    * from the free boolean algebra to the algebra of B.
@@ -15,26 +16,30 @@ trait FreeBoolAlgebra[F[_]] {
    */
   def nat[A,B](f: A => B)(implicit ba: Bool[B]): F[A] => B
 
-  def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new ConcreteFreeBoolAlgebra[A,F] {
-    val bool = FreeBoolAlgebra.this.bool[A]
+  implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new BoolWrappedConcreteFreeBoolAlgebra[A,F] {
+    protected lazy val bool = FreeBoolAlgebra.this.bool[A]
     def nat[B](f: A=>B)(implicit ba: Bool[B]) = FreeBoolAlgebra.this.nat[A,B](f)
   }
 }
 
-trait ConcreteFreeBoolAlgebra[A, F[_]] {
-  // A Free Boolean Algebra has a Bool[P]
-  def bool: Bool[F[A]]
-
-  /* For any function f: A => B, B a boolean algebra, there exists a natural homomorphism
-   * from the free boolean algebra to the algebra of B.
-   * It satisfies the property that nat(f)(x.point) = f(x)
-   */
+trait ConcreteFreeBoolAlgebra[A, F[_]] extends Bool[F[A]] {
   def nat[B](f: A => B)(implicit ba: Bool[B]): F[A] => B
 }
 
+private trait BoolWrappedConcreteFreeBoolAlgebra[A, F[_]] extends ConcreteFreeBoolAlgebra[A,F] {
+  protected def bool: Bool[F[A]]
+
+  lazy val zero = bool.zero
+  lazy val one = bool.one
+  def and(a: F[A], b: F[A]) = bool.and(a,b)
+  def complement(a: F[A]) = bool.complement(a)
+  def or(a: F[A], b: F[A]) = bool.or(a,b)
+}
+
 trait FreeBoolSyntax {
-  def truePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool.one
-  def falsePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool.zero
+  def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
+  def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
+  def andPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x & y)
 }
 
 trait FreeBoolListInstances {
@@ -55,6 +60,26 @@ trait FreeBoolListInstances {
   import FreeBoolList._
 
   object FreeBoolListAlgebra extends FreeBoolAlgebra[FreeBoolList] {
+    def point[P](p: =>P): FreeBoolList[P] = Pred(p)
+
+    def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
+      case TruePred => TruePred
+      case FalsePred => FalsePred
+      case Pred(x) => f(x)
+      case Negate(x) => Negate(bind(x)(f))
+      case AndPred(terms) => AndPred(terms.map(t => bind(t)(f)))
+      case OrPred(terms) => OrPred(terms.map(t => bind(t)(f)))
+    }
+
+    override def map[A, B](fa: FreeBoolList[A])(f: A => B): FreeBoolList[B] = fa match {
+      case TruePred => TruePred
+      case FalsePred => FalsePred
+      case Pred(x) => Pred(f(x))
+      case Negate(x) => Negate(map(x)(f))
+      case AndPred(terms) => AndPred(terms.map(t => map(t)(f)))
+      case OrPred(terms) => OrPred(terms.map(t => map(t)(f)))
+    }
+
     def bool[P] = new Bool[FreeBoolList[P]] {
       def and(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (FalsePred, _) => FalsePred
@@ -180,36 +205,34 @@ trait FreeBoolSimpleInstances {
       def order(x: FreeBoolSimple[P] with NotOrPred, y: FreeBoolSimple[P] with NotOrPred) = FreeBoolOrder.order(x,y)
     }
 
-    val bool = new Bool[FreeBoolSimple[P]] {
-      def and(a: FreeBoolSimple[P], b: FreeBoolSimple[P]) = (a,b) match {
-        case (FalsePred, _) => FalsePred
-        case (_, FalsePred) => FalsePred
-        case (TruePred, x:AndPred[P]) => x
-        case (x: AndPred[P], TruePred) => x
-        case (AndPred(terms1), AndPred(terms2)) => AndPred(terms1 ++ terms2)
-        case (AndPred(terms), (x: NotAndPred)) => AndPred(terms.insert(x))
-        case (x:NotAndPred, AndPred(terms)) => AndPred(terms.insert(x))
-        case (x:NotAndPred,y:NotAndPred) => AndPred(CovariantSet(x,y))
-      }
-      def or(a: FreeBoolSimple[P], b: FreeBoolSimple[P]) = (a,b) match {
-        case (TruePred, _) => TruePred
-        case (_, TruePred) => TruePred
-        case (FalsePred, x:AndPred[P]) => x
-        case (x: OrPred[P], FalsePred) => x
-        case (OrPred(terms1), OrPred(terms2)) => OrPred(terms1 ++ terms2)
-        case (OrPred(terms), (x:NotOrPred)) => OrPred(terms.insert(x))
-        case (x:NotOrPred, OrPred(terms)) => OrPred(terms.insert(x))
-        case (x:NotOrPred,y:NotOrPred) => OrPred(CovariantSet(x,y))
-      }
-      def complement(a: FreeBoolSimple[P]) = a match {
-        case Negate(x) => x
-        case FalsePred => TruePred
-        case TruePred => FalsePred
-        case x => Negate(x)
-      }
-      def zero: FreeBoolSimple[P] = FalsePred: FreeBoolSimple[P]
-      def one: FreeBoolSimple[P] = TruePred
+    def and(a: FreeBoolSimple[P], b: FreeBoolSimple[P]) = (a,b) match {
+      case (FalsePred, _) => FalsePred
+      case (_, FalsePred) => FalsePred
+      case (TruePred, x:AndPred[P]) => x
+      case (x: AndPred[P], TruePred) => x
+      case (AndPred(terms1), AndPred(terms2)) => AndPred(terms1 ++ terms2)
+      case (AndPred(terms), (x: NotAndPred)) => AndPred(terms.insert(x))
+      case (x:NotAndPred, AndPred(terms)) => AndPred(terms.insert(x))
+      case (x:NotAndPred,y:NotAndPred) => AndPred(CovariantSet(x,y))
     }
+    def or(a: FreeBoolSimple[P], b: FreeBoolSimple[P]) = (a,b) match {
+      case (TruePred, _) => TruePred
+      case (_, TruePred) => TruePred
+      case (FalsePred, x:AndPred[P]) => x
+      case (x: OrPred[P], FalsePred) => x
+      case (OrPred(terms1), OrPred(terms2)) => OrPred(terms1 ++ terms2)
+      case (OrPred(terms), (x:NotOrPred)) => OrPred(terms.insert(x))
+      case (x:NotOrPred, OrPred(terms)) => OrPred(terms.insert(x))
+      case (x:NotOrPred,y:NotOrPred) => OrPred(CovariantSet(x,y))
+    }
+    def complement(a: FreeBoolSimple[P]) = a match {
+      case Negate(x) => x
+      case FalsePred => TruePred
+      case TruePred => FalsePred
+      case x => Negate(x)
+    }
+    def zero: FreeBoolSimple[P] = FalsePred: FreeBoolSimple[P]
+    def one: FreeBoolSimple[P] = TruePred
 
     def nat[B](f: P => B)(implicit ba: Bool[B]): (FreeBoolSimple[P] => B) = {
       /* For any function f: A => B, B a boolean algebra, there exists a natural homomorphism
