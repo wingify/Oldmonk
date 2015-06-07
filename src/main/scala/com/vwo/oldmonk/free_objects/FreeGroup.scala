@@ -17,11 +17,8 @@ trait FreeGroup[F[_]] extends Functor[F] {
    */
   def nat[A,B](f: A => B)(implicit m: Group[B]): F[A] => B
 
-  def map[A,B](fa: F[A])(f: A => B) = {
-    //This is probably not the most efficient way, but it's so pretty
-    def liftedF(a: A): F[B] = point[B](f(a))
-    nat(liftedF)(group[B])(fa)
-  }
+  //This is probably not the most efficient way, but it's so pretty
+  def map[A,B](fa: F[A])(f: A => B) = nat((a:A) => point[B](f(a)))(group[B])(fa)
 }
 
 sealed trait FreeGroupElement[+A]

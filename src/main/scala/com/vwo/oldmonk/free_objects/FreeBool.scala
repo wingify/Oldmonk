@@ -6,7 +6,7 @@ import com.vwo.oldmonk.datastructures.CovariantSet
 import spire.algebra.{Order => SpireOrder, _}
 import spire.implicits._
 
-trait FreeBoolAlgebra[F[_]] extends Functor[F] with Monad[F] {
+trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F] {
   // A Free Boolean Algebra has a Bool[P]
   implicit def bool[A]: Bool[F[A]]
 
@@ -15,6 +15,9 @@ trait FreeBoolAlgebra[F[_]] extends Functor[F] with Monad[F] {
    * It satisfies the property that nat(f)(x.point) = f(x)
    */
   def nat[A,B](f: A => B)(implicit ba: Bool[B]): F[A] => B
+
+  override def map[A, B](fa: F[A])(f: A => B): F[B] = nat((a:A) => point[B](f(a)))(bool[B])(fa)
+  def bind[A,B](fa: F[A])(f: A => F[B]): F[B] = nat((a:A) => f(a))(bool[B])(fa)
 
   implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new BoolWrappedConcreteFreeBoolAlgebra[A,F] {
     protected lazy val bool = FreeBoolAlgebra.this.bool[A]
@@ -62,7 +65,7 @@ trait FreeBoolListInstances {
   object FreeBoolListAlgebra extends FreeBoolAlgebra[FreeBoolList] {
     def point[P](p: =>P): FreeBoolList[P] = Pred(p)
 
-    def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
+    override def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
       case TruePred => TruePred
       case FalsePred => FalsePred
       case Pred(x) => f(x)
