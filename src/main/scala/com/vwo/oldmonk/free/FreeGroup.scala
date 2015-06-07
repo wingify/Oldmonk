@@ -1,4 +1,4 @@
-package com.vwo.oldmonk.free_objects
+package com.vwo.oldmonk.free
 
 import scalaz._
 import Scalaz._
