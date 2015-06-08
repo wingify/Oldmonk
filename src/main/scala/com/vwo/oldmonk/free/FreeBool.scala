@@ -43,6 +43,7 @@ trait FreeBoolSyntax {
   def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
   def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
   def andPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x & y)
+  def orPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x | y)
 }
 
 trait FreeBoolListInstances {
