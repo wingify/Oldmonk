@@ -6,7 +6,7 @@ import com.vwo.oldmonk.datastructures.CovariantSet
 import spire.algebra.{Order => SpireOrder, _}
 import spire.implicits._
 
-trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F] {
+trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F] with Traverse[F] {
   // A Free Boolean Algebra has a Bool[P]
   implicit def bool[A]: Bool[F[A]]
 
@@ -42,8 +42,18 @@ private trait BoolWrappedConcreteFreeBoolAlgebra[A, F[_]] extends ConcreteFreeBo
 trait FreeBoolSyntax {
   def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
   def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
+  def truePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool[P].one
+  def falsePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool[P].zero
   def andPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x & y)
   def orPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x | y)
+/*  def andPred[P, F[_]](ps: F[P]*)(implicit a: FreeBoolAlgebra[F]) = {
+    implicit val ca = a.bool[P]
+    ps.foldLeft(ca.one)( (x: F[P],y: F[P]) => x & y)
+  }
+  def orPred[P, F[_]](ps: F[P]*)(implicit a: FreeBoolAlgebra[F]) = {
+    implicit val ca = a.bool[P]
+    ps.foldLeft(ca.one)( (x: F[P],y: F[P]) => x | y)
+  }*/
 }
 
 trait FreeBoolListInstances {
@@ -65,6 +75,14 @@ trait FreeBoolListInstances {
 
   object FreeBoolListAlgebra extends FreeBoolAlgebra[FreeBoolList] {
     def point[P](p: =>P): FreeBoolList[P] = Pred(p)
+
+    def traverseImpl[G[_], A, B](fa: FreeBoolList[A])(f: A => G[B])(implicit ap: Applicative[G]): G[FreeBoolList[B]] = fa match {
+      case Pred(u) => f(u).map(x => point[B](x))
+      case Negate(term) => traverseImpl(term)(f).map(x => Negate(x))
+      case (x:ConstantFreeBoolList) => (x:FreeBoolList[B]).point[G]
+      case AndPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => AndPred(tt))
+      case OrPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => OrPred(tt))
+    }
 
     override def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
       case TruePred => TruePred
