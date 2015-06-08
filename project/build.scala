@@ -12,7 +12,7 @@ object ApplicationBuild extends Build {
     version := "0.01." + "git rev-parse HEAD".!!.trim,
     resolvers ++= myResolvers,
     scalacOptions := Seq("-deprecation"),
-    name := "widow_jane",
+    name := "oldmonk",
     //fork := true,
     libraryDependencies ++= Dependencies.all,
     // Akka settings
@@ -75,5 +75,5 @@ object ApplicationBuild extends Build {
     "bigtoast-github"                        at "http://bigtoast.github.com/repo/" // For sbt-thrift
   )
 
-  lazy val widowJane = Project("oldmonk", file("."), settings = commonSettings)
+  lazy val oldmonk = Project("oldmonk", file("."), settings = commonSettings)
 }
