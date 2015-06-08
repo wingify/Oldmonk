@@ -42,18 +42,8 @@ private trait BoolWrappedConcreteFreeBoolAlgebra[A, F[_]] extends ConcreteFreeBo
 trait FreeBoolSyntax {
   def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
   def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
-  def truePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool[P].one
-  def falsePred[P, F[_]](implicit a: FreeBoolAlgebra[F]): F[P] = a.bool[P].zero
   def andPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x & y)
   def orPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x | y)
-/*  def andPred[P, F[_]](ps: F[P]*)(implicit a: FreeBoolAlgebra[F]) = {
-    implicit val ca = a.bool[P]
-    ps.foldLeft(ca.one)( (x: F[P],y: F[P]) => x & y)
-  }
-  def orPred[P, F[_]](ps: F[P]*)(implicit a: FreeBoolAlgebra[F]) = {
-    implicit val ca = a.bool[P]
-    ps.foldLeft(ca.one)( (x: F[P],y: F[P]) => x | y)
-  }*/
 }
 
 trait FreeBoolListInstances {
