@@ -96,8 +96,8 @@ trait FreeBoolListInstances {
       def and(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (FalsePred, _) => FalsePred
         case (_, FalsePred) => FalsePred
-        case (TruePred, x:AndPred[P]) => x
-        case (x: AndPred[P], TruePred) => x
+        case (TruePred, x) => x
+        case (x, TruePred) => x
         case (AndPred(terms1), AndPred(terms2)) => AndPred(terms1 ++ terms2)
         case (AndPred(terms), x) => AndPred(x :: terms)
         case (x, AndPred(terms)) => AndPred(x :: terms)
@@ -106,8 +106,8 @@ trait FreeBoolListInstances {
       def or(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (TruePred, _) => TruePred
         case (_, TruePred) => TruePred
-        case (FalsePred, x:AndPred[P]) => x
-        case (x: OrPred[P], FalsePred) => x
+        case (FalsePred, x) => x
+        case (x, FalsePred) => x
         case (OrPred(terms1), OrPred(terms2)) => OrPred(terms1 ++ terms2)
         case (OrPred(terms), x) => OrPred(x :: terms)
         case (x, OrPred(terms)) => OrPred(x :: terms)
