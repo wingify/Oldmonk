@@ -12,36 +12,40 @@ import spire.math._
 import spire.implicits._
 import spire.syntax._
 
-object FreeBoolSpec extends Properties("FreeBoolSpec") {
-//  implicit val fb = FreeBool.FreeBoolBooleanAlgebra[Int]
+abstract class FreeBoolSpec(prop: String) extends Properties(prop) {
 
-  implicit val fbl = FreeBoolListAlgebra
+  type FreeBool[A]
+  implicit val fbl: FreeBoolAlgebra[FreeBool]
   import fbl._
 
   property("lift and nat commute") = forAll( (x: Int) => {
     def f(t: Int) = (t % 3) == 1
-
-    fbl.nat(f)(implicitly[Bool[Boolean]])(x.point[FreeBoolList]) == f(x)
+    fbl.nat(f)(implicitly[Bool[Boolean]])(x.point[FreeBool]) == f(x)
   })
 
   property("lift and nat commute, free algebra") = forAll( (x: Int) => {
-    def f(t: Int) = t.toString.point[FreeBoolList]
+    def f(t: Int) = t.toString.point[FreeBool]
 
-    fbl.nat(f)(fbl.bool[String])(x.point[FreeBoolList]) == f(x)
+    fbl.nat(f)(fbl.bool[String])(x.point[FreeBool]) == f(x)
   })
 
   property("nat commutes with &") = forAll( (x: Int, y: Int) => {
-    def f(t: Int) = t.toString.point[FreeBoolList]
-    fbl.nat(f)(fbl.bool[String])(x.point[FreeBoolList] & y.point[FreeBoolList]) == (f(x) & f(y))
+    def f(t: Int) = t.toString.point[FreeBool]
+    fbl.nat(f)(fbl.bool[String])(x.point[FreeBool] & y.point[FreeBool]) == (f(x) & f(y))
   })
 
   property("nat commutes with |") = forAll( (x: Int, y: Int) => {
-    def f(t: Int) = t.toString.point[FreeBoolList]
-    fbl.nat(f)(fbl.bool[String])(x.point[FreeBoolList] | y.point[FreeBoolList]) == (f(x) | f(y))
+    def f(t: Int) = t.toString.point[FreeBool]
+    fbl.nat(f)(fbl.bool[String])(x.point[FreeBool] | y.point[FreeBool]) == (f(x) | f(y))
   })
 
   property("nat commutes with ~") = forAll( (x: Int) => {
-    def f(t: Int) = t.toString.point[FreeBoolList]
-    fbl.nat(f)(fbl.bool[String])(~x.point[FreeBoolList]) == (~f(x))
+    def f(t: Int) = t.toString.point[FreeBool]
+    fbl.nat(f)(fbl.bool[String])(~x.point[FreeBool]) == (~f(x))
   })
+}
+
+class FreeBoolListSpec extends FreeBoolSpec("FreeBoolListSpec") {
+  type FreeBool[A] = FreeBoolList[A]
+  implicit val fbl = FreeBoolListAlgebra
 }
