@@ -42,8 +42,14 @@ private trait BoolWrappedConcreteFreeBoolAlgebra[A, F[_]] extends ConcreteFreeBo
 trait FreeBoolSyntax {
   def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
   def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
-  def andPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x & y)
-  def orPred[P, F[_]](ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(a.one)( (x: F[P],y: F[P]) => x | y)
+  def andPred[P, F[_]](terms: Seq[F[P]])(implicit a: ConcreteFreeBoolAlgebra[P,F]) = terms.headOption.map(h =>
+    terms.tail.foldLeft(h)( (x: F[P],y: F[P]) => x & y)
+  ).getOrElse(a.one)
+  def andPred[P, F[_]](fst: F[P], ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x & y)
+  def orPred[P, F[_]](fst: F[P], ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x | y)
+  def orPred[P, F[_]](terms: Seq[F[P]])(implicit a: ConcreteFreeBoolAlgebra[P,F]) = terms.headOption.map(h =>
+    terms.tail.foldLeft(h)( (x: F[P],y: F[P]) => x | y)
+  ).getOrElse(a.zero)
 }
 
 trait FreeBoolListInstances {
@@ -52,14 +58,18 @@ trait FreeBoolListInstances {
   sealed trait FreeBoolList[+P]
 
   object FreeBoolList {
-    sealed trait ConstantFreeBoolList extends FreeBoolList[Nothing]
+    sealed trait NotAndPred
+    sealed trait NotOrPred
+    sealed trait NotNegated
+
+    sealed trait ConstantFreeBoolList extends FreeBoolList[Nothing] with NotAndPred with NotOrPred with NotNegated
     case object TruePred extends ConstantFreeBoolList
     case object FalsePred extends ConstantFreeBoolList
 
-    case class Pred[+P](p: P) extends FreeBoolList[P]
-    case class Negate[+P](term: FreeBoolList[P]) extends FreeBoolList[P]
-    case class AndPred[+P](terms: List[FreeBoolList[P]]) extends FreeBoolList[P]
-    case class OrPred[+P](terms: List[FreeBoolList[P]]) extends FreeBoolList[P]
+    case class Pred[+P](p: P) extends FreeBoolList[P] with NotOrPred with NotAndPred with NotNegated
+    case class Negate[+P](term: FreeBoolList[P] with NotNegated) extends FreeBoolList[P] with NotAndPred with NotOrPred
+    case class AndPred[+P](terms: List[FreeBoolList[P] with NotAndPred]) extends FreeBoolList[P] with NotOrPred with NotNegated
+    case class OrPred[+P](terms: List[FreeBoolList[P] with NotOrPred]) extends FreeBoolList[P] with NotAndPred with NotNegated
   }
   import FreeBoolList._
 
@@ -68,28 +78,28 @@ trait FreeBoolListInstances {
 
     def traverseImpl[G[_], A, B](fa: FreeBoolList[A])(f: A => G[B])(implicit ap: Applicative[G]): G[FreeBoolList[B]] = fa match {
       case Pred(u) => f(u).map(x => point[B](x))
-      case Negate(term) => traverseImpl(term)(f).map(x => Negate(x))
+      case Negate(term) => traverseImpl(term)(f).map(x => ~x)
       case (x:ConstantFreeBoolList) => (x:FreeBoolList[B]).point[G]
-      case AndPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => AndPred(tt))
-      case OrPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => OrPred(tt))
+      case AndPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => andPred(tt))
+      case OrPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => orPred(tt))
     }
 
     override def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
       case TruePred => TruePred
       case FalsePred => FalsePred
       case Pred(x) => f(x)
-      case Negate(x) => Negate(bind(x)(f))
-      case AndPred(terms) => AndPred(terms.map(t => bind(t)(f)))
-      case OrPred(terms) => OrPred(terms.map(t => bind(t)(f)))
+      case Negate(x) => ~(bind(x)(f))
+      case AndPred(terms) => andPred(terms.map(t => bind(t)(f)))
+      case OrPred(terms) => orPred(terms.map(t => bind(t)(f)))
     }
 
     override def map[A, B](fa: FreeBoolList[A])(f: A => B): FreeBoolList[B] = fa match {
       case TruePred => TruePred
       case FalsePred => FalsePred
       case Pred(x) => Pred(f(x))
-      case Negate(x) => Negate(map(x)(f))
-      case AndPred(terms) => AndPred(terms.map(t => map(t)(f)))
-      case OrPred(terms) => OrPred(terms.map(t => map(t)(f)))
+      case Negate(x) => ~(map(x)(f))
+      case AndPred(terms) => andPred(terms.map(t => map(t)(f)))
+      case OrPred(terms) => orPred(terms.map(t => map(t)(f)))
     }
 
     def bool[P] = new Bool[FreeBoolList[P]] {
@@ -99,9 +109,9 @@ trait FreeBoolListInstances {
         case (TruePred, x) => x
         case (x, TruePred) => x
         case (AndPred(terms1), AndPred(terms2)) => AndPred(terms1 ++ terms2)
-        case (AndPred(terms), x) => AndPred(x :: terms)
-        case (x, AndPred(terms)) => AndPred(x :: terms)
-        case (x,y) => AndPred(List(x,y))
+        case (AndPred(terms), x:NotAndPred) => AndPred(x :: terms)
+        case (x:NotAndPred, AndPred(terms)) => AndPred(x :: terms)
+        case (x:NotAndPred,y:NotAndPred) => AndPred(List(x,y))
       }
       def or(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (TruePred, _) => TruePred
@@ -109,15 +119,15 @@ trait FreeBoolListInstances {
         case (FalsePred, x) => x
         case (x, FalsePred) => x
         case (OrPred(terms1), OrPred(terms2)) => OrPred(terms1 ++ terms2)
-        case (OrPred(terms), x) => OrPred(x :: terms)
-        case (x, OrPred(terms)) => OrPred(x :: terms)
-        case (x,y) => OrPred(List(x,y))
+        case (OrPred(terms), x: NotOrPred) => OrPred(x :: terms)
+        case (x: NotOrPred, OrPred(terms)) => OrPred(x :: terms)
+        case (x:NotOrPred,y:NotOrPred) => OrPred(List(x,y))
       }
       def complement(a: FreeBoolList[P]) = a match {
         case Negate(x) => x
         case FalsePred => TruePred
         case TruePred => FalsePred
-        case x => Negate(x)
+        case (x:NotNegated) => Negate(x)
       }
       def zero: FreeBoolList[P] = FalsePred: FreeBoolList[P]
       def one: FreeBoolList[P] = TruePred
@@ -143,16 +153,17 @@ trait FreeBoolSimpleInstances {
   case object FreeBoolSimple {
     sealed trait NotAndPred
     sealed trait NotOrPred
+    sealed trait NotNegated
 
     // True and false
     sealed trait ConstantFreeBoolSimple extends FreeBoolSimple[Nothing]
-    case object TruePred extends ConstantFreeBoolSimple with NotAndPred with NotOrPred
-    case object FalsePred extends ConstantFreeBoolSimple with NotAndPred with NotOrPred
+    case object TruePred extends ConstantFreeBoolSimple with NotAndPred with NotOrPred with NotNegated
+    case object FalsePred extends ConstantFreeBoolSimple with NotAndPred with NotOrPred with NotNegated
 
-    case class Pred[+P](p: P) extends FreeBoolSimple[P] with NotAndPred with NotOrPred
-    case class Negate[+P](term: FreeBoolSimple[P]) extends FreeBoolSimple[P] with NotAndPred with NotOrPred
-    case class AndPred[+P](terms: CovariantSet[FreeBoolSimple[P] with NotAndPred]) extends FreeBoolSimple[P] with NotOrPred
-    case class OrPred[+P](terms: CovariantSet[FreeBoolSimple[P] with NotOrPred]) extends FreeBoolSimple[P] with NotAndPred
+    case class Pred[+P](p: P) extends FreeBoolSimple[P] with NotAndPred with NotOrPred with NotNegated
+    case class Negate[+P](term: FreeBoolSimple[P] with NotNegated) extends FreeBoolSimple[P] with NotAndPred with NotOrPred
+    case class AndPred[+P](terms: CovariantSet[FreeBoolSimple[P] with NotAndPred]) extends FreeBoolSimple[P] with NotOrPred with NotNegated
+    case class OrPred[+P](terms: CovariantSet[FreeBoolSimple[P] with NotOrPred]) extends FreeBoolSimple[P] with NotAndPred with NotNegated
   }
   import FreeBoolSimple._
 
@@ -241,7 +252,7 @@ trait FreeBoolSimpleInstances {
       case Negate(x) => x
       case FalsePred => TruePred
       case TruePred => FalsePred
-      case x => Negate(x)
+      case (x:NotNegated) => Negate(x)
     }
     def zero: FreeBoolSimple[P] = FalsePred: FreeBoolSimple[P]
     def one: FreeBoolSimple[P] = TruePred
