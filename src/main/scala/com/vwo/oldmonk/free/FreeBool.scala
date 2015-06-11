@@ -19,24 +19,19 @@ trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F]
   override def map[A, B](fa: F[A])(f: A => B): F[B] = nat((a:A) => point[B](f(a)))(bool[B])(fa)
   def bind[A,B](fa: F[A])(f: A => F[B]): F[B] = nat((a:A) => f(a))(bool[B])(fa)
 
-  implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new BoolWrappedConcreteFreeBoolAlgebra[A,F] {
+  implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new ConcreteFreeBoolAlgebra[A,F] {
     protected lazy val bool = FreeBoolAlgebra.this.bool[A]
     def nat[B](f: A=>B)(implicit ba: Bool[B]) = FreeBoolAlgebra.this.nat[A,B](f)
+    lazy val zero = bool.zero
+    lazy val one = bool.one
+    def and(a: F[A], b: F[A]) = bool.and(a,b)
+    def complement(a: F[A]) = bool.complement(a)
+    def or(a: F[A], b: F[A]) = bool.or(a,b)
   }
 }
 
 trait ConcreteFreeBoolAlgebra[A, F[_]] extends Bool[F[A]] {
   def nat[B](f: A => B)(implicit ba: Bool[B]): F[A] => B
-}
-
-private trait BoolWrappedConcreteFreeBoolAlgebra[A, F[_]] extends ConcreteFreeBoolAlgebra[A,F] {
-  protected def bool: Bool[F[A]]
-
-  lazy val zero = bool.zero
-  lazy val one = bool.one
-  def and(a: F[A], b: F[A]) = bool.and(a,b)
-  def complement(a: F[A]) = bool.complement(a)
-  def or(a: F[A], b: F[A]) = bool.or(a,b)
 }
 
 trait FreeBoolSyntax {
