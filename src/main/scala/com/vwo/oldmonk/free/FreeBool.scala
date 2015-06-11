@@ -20,7 +20,7 @@ trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F]
   def bind[A,B](fa: F[A])(f: A => F[B]): F[B] = nat((a:A) => f(a))(bool[B])(fa)
 
   implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new ConcreteFreeBoolAlgebra[A,F] {
-    protected lazy val bool = FreeBoolAlgebra.this.bool[A]
+    protected val bool = FreeBoolAlgebra.this.bool[A]
     def nat[B](f: A=>B)(implicit ba: Bool[B]) = FreeBoolAlgebra.this.nat[A,B](f)
     lazy val zero = bool.zero
     lazy val one = bool.one
