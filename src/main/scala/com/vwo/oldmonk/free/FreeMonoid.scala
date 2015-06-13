@@ -7,8 +7,8 @@ trait FreeMonoid[F[_]] extends Monad[F] {
   // A Free Monoid has a Monoid instance[P]
   implicit def monoid[A]: Monoid[F[A]]
 
-  /* For any function f: A => B, B a boolean algebra, there exists a natural homomorphism
-   * from the free boolean algebra to the algebra of B.
+  /* For any function f: A => B, B a Monoid, there exists a natural homomorphism
+   * from the free Monoid to B.
    * It satisfies the property that nat(f)(x.point) = f(x)
    */
   def nat[A,B](f: A => B)(implicit m: Monoid[B]): F[A] => B
