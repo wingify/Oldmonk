@@ -25,7 +25,6 @@ abstract class FreeBoolSpec(prop: String) extends Properties(prop) {
 
   property("lift and nat commute, free algebra") = forAll( (x: Int) => {
     def f(t: Int) = t.toString.point[FreeBool]
-
     fbl.nat(f)(fbl.bool[String])(x.point[FreeBool]) == f(x)
   })
 
