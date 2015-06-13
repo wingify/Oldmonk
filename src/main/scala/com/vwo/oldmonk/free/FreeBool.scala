@@ -31,6 +31,10 @@ trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F]
 }
 
 trait ConcreteFreeBoolAlgebra[A, F[_]] extends Bool[F[A]] {
+  // This is used when some specific property of A is required to build a free bool
+  // e.g., A might be required to be ordered
+  // You'd then have:
+  //   def concreteBool[A](implicit o: Order[A]): ConcreteFreeBoolAlgebra[A,F] = ???
   def nat[B](f: A => B)(implicit ba: Bool[B]): F[A] => B
 }
 
