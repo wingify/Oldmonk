@@ -31,7 +31,6 @@ class DeduplicationSpec extends Properties("Deduplication") {
   })
 
   property("Deduplicator") = forAll( (x: List[String], y: List[String]) => {
-    var cnt: Int = 0
     val f = Deduplicator[List[String]]()
     (f(x) eq x) && (f(x) eq f(f(x))) && (f(y) eq y) // Use 'eq' to check reference equality, i.e. both are same object
   })
