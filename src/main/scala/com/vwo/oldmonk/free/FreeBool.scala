@@ -57,18 +57,25 @@ trait FreeBoolListInstances {
   sealed trait FreeBoolList[+P]
 
   object FreeBoolList {
+    /*
+     * These traits are used to enforce some simplicity of expressions at the type level.
+     * For example, AndPred(List(True, Pred(a), Pred(b))) is equivalent to AndPred(List(Pred(a), Pred(b)))
+     * and AndPred(List(False, ...)) = False
+     * So why represent these cases in the type system at all?
+     */
     sealed trait NotAndPred
     sealed trait NotOrPred
     sealed trait NotNegated
+    sealed trait CanVary
 
     sealed trait ConstantFreeBoolList extends FreeBoolList[Nothing] with NotAndPred with NotOrPred with NotNegated
     case object TruePred extends ConstantFreeBoolList
     case object FalsePred extends ConstantFreeBoolList
 
-    case class Pred[+P](p: P) extends FreeBoolList[P] with NotOrPred with NotAndPred with NotNegated
-    case class Negate[+P](term: FreeBoolList[P] with NotNegated) extends FreeBoolList[P] with NotAndPred with NotOrPred
-    case class AndPred[+P](terms: List[FreeBoolList[P] with NotAndPred]) extends FreeBoolList[P] with NotOrPred with NotNegated
-    case class OrPred[+P](terms: List[FreeBoolList[P] with NotOrPred]) extends FreeBoolList[P] with NotAndPred with NotNegated
+    case class Pred[+P](p: P) extends FreeBoolList[P] with NotOrPred with NotAndPred with NotNegated with CanVary
+    case class Negate[+P](term: FreeBoolList[P] with NotNegated) extends FreeBoolList[P] with NotAndPred with NotOrPred with CanVary
+    case class AndPred[+P](terms: List[FreeBoolList[P] with NotAndPred with CanVary]) extends FreeBoolList[P] with NotOrPred with NotNegated with CanVary
+    case class OrPred[+P](terms: List[FreeBoolList[P] with NotOrPred with CanVary]) extends FreeBoolList[P] with NotAndPred with NotNegated with CanVary
   }
   import FreeBoolList._
 
@@ -108,9 +115,9 @@ trait FreeBoolListInstances {
         case (TruePred, x) => x
         case (x, TruePred) => x
         case (AndPred(terms1), AndPred(terms2)) => AndPred(terms1 ++ terms2)
-        case (AndPred(terms), x:NotAndPred) => AndPred(x :: terms)
-        case (x:NotAndPred, AndPred(terms)) => AndPred(x :: terms)
-        case (x:NotAndPred,y:NotAndPred) => AndPred(List(x,y))
+        case (AndPred(terms), x:NotAndPred with CanVary) => AndPred(x :: terms)
+        case (x:NotAndPred with CanVary, AndPred(terms)) => AndPred(x :: terms)
+        case (x:NotAndPred with CanVary,y:NotAndPred with CanVary) => AndPred(List(x,y))
       }
       def or(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (TruePred, _) => TruePred
@@ -118,9 +125,9 @@ trait FreeBoolListInstances {
         case (FalsePred, x) => x
         case (x, FalsePred) => x
         case (OrPred(terms1), OrPred(terms2)) => OrPred(terms1 ++ terms2)
-        case (OrPred(terms), x: NotOrPred) => OrPred(x :: terms)
-        case (x: NotOrPred, OrPred(terms)) => OrPred(x :: terms)
-        case (x:NotOrPred,y:NotOrPred) => OrPred(List(x,y))
+        case (OrPred(terms), x:NotOrPred with CanVary) => OrPred(x :: terms)
+        case (x:NotOrPred with CanVary, OrPred(terms)) => OrPred(x :: terms)
+        case (x:NotOrPred with CanVary, y:NotOrPred with CanVary) => OrPred(List(x,y))
       }
       def complement(a: FreeBoolList[P]) = a match {
         case Negate(x) => x
