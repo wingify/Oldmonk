@@ -4,7 +4,7 @@ import com.google.common.cache._
 import java.util.concurrent.TimeUnit
 
 package object deduplication {
-  trait IdempotentEffect[A] {
+  trait IdempotentEffect[A] extends (A => Unit) {
     // This function represents a side-effecting method which should be called only once.
     def apply(key: A): Unit
   }
