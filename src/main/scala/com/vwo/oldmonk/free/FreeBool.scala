@@ -73,7 +73,7 @@ trait FreeBoolListInstances {
     case object FalsePred extends ConstantFreeBoolList
 
     case class Pred[+P](p: P) extends FreeBoolList[P] with NotOrPred with NotAndPred with NotNegated with CanVary
-    case class Negate[+P](term: FreeBoolList[P] with NotNegated) extends FreeBoolList[P] with NotAndPred with NotOrPred with CanVary
+    case class Negate[+P](term: FreeBoolList[P] with NotNegated with CanVary) extends FreeBoolList[P] with NotAndPred with NotOrPred with CanVary
     case class AndPred[+P](terms: List[FreeBoolList[P] with NotAndPred with CanVary]) extends FreeBoolList[P] with NotOrPred with NotNegated with CanVary
     case class OrPred[+P](terms: List[FreeBoolList[P] with NotOrPred with CanVary]) extends FreeBoolList[P] with NotAndPred with NotNegated with CanVary
   }
@@ -133,7 +133,7 @@ trait FreeBoolListInstances {
         case Negate(x) => x
         case FalsePred => TruePred
         case TruePred => FalsePred
-        case (x:NotNegated) => Negate(x)
+        case (x:NotNegated with CanVary) => Negate(x)
       }
       def zero: FreeBoolList[P] = FalsePred: FreeBoolList[P]
       def one: FreeBoolList[P] = TruePred
