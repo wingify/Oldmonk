@@ -8,7 +8,7 @@ object ApplicationBuild extends Build {
   lazy val commonSettings = Defaults.defaultSettings ++ Seq(
     organization := "com.vwo",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-    scalaVersion := "2.11.5",
+    scalaVersion := "2.11.7",
     version := "0.01." + "git rev-parse HEAD".!!.trim,
     resolvers ++= myResolvers,
     scalacOptions := Seq("-deprecation"),
