@@ -40,6 +40,7 @@ Another way to think of it is that it's a data structure with no interpretation.
 
 # Deduplication
 
+## Deduplicator
 A couple of useful deduplication objects can be found here. To save memory, there is the `Deduplicator[T]: T => T` which lifts semantic equality to memory equality:
 
 ```scala
@@ -52,6 +53,8 @@ A couple of useful deduplication objects can be found here. To save memory, ther
 (There are of course cache-based limitations on this.)
 
 Here, `eq` means that the object on the left has the same memory location as the object on the right. Semantically a deduplicator is the identity function.
+
+## IdempotentEffect
 
 There is also the `IdempotentEffect` which is a way of reducing the number of times an effectful function is called.
 
@@ -72,3 +75,23 @@ val markEventAsOccurredInDatabase: Event => Unit = IdempotentEffect((e:Event) =>
 ```
 
 Repeated calls to this function for the same event will not cause repeated round trips to the database.
+
+## DelayedIdempotentEffect
+
+There is also the `DelayedIdempotentEffect`. The method `DelayedIdempotentEffect.apply` will return an `Option[DelayedIdempotentEffect.IdempotentMarker]` object. Future calls to the effectful method will only be called *after* the `IdempotentMarker` is called. A concrete example illustrating both how and why:
+
+```scala
+val insertIntoDatabase = DelayedIdempotentEffect[X,java.sql.Connection]((x,conn) => insertIntoDatabaseNoCommit(x, conn))
+...
+
+val conn = databse.getConnection()
+val marker = insertIntoDatabase(key, conn)
+...
+... // Future calls to insertIntoDatabase(key) will attempt to insert
+connection.commit()
+marker.foreach(x => x()) //Now, *after* the insert is committed, future attempts will be prevented
+```
+
+Deduplication is handled based on the *first* argument, the second argument is ignored. So repeated calls to `insertIntoDatabase` with the *same* value of `x` but different values of `conn` will be deduplicated.
+
+There is also a `DelayedIdempotentEffect.simple[X](x => f(x))` method which ignores the other argument.
