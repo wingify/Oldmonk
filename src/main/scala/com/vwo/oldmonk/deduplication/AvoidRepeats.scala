@@ -39,10 +39,10 @@ trait ProvidesAvoidRepeats {
   object DelayedIdempotentEffect {
 
     def simple[A <: Object](f: (A) => Unit, timeout: Int = 24*60*60, maxSize: Int = 1024): DelayedIdempotentEffectNoOtherArg[A] = new DelayedIdempotentEffectNoOtherArg[A] {
-      private val cache: Cache[A,IdempotentMarker[A]] = CacheBuilder.newBuilder().maximumSize(maxSize).expireAfterWrite(timeout, TimeUnit.SECONDS).build()
+      private val cache: Cache[A,A] = CacheBuilder.newBuilder().maximumSize(maxSize).expireAfterWrite(timeout, TimeUnit.SECONDS).build()
 
       private case class ConcreteDelayedIdempotent(key: A) extends IdempotentMarker[A] { self =>
-        def apply() = cache.put(key, self)
+        def apply() = cache.put(key, key)
       }
 
       def apply(key: A, otherArgs: Unit): Option[IdempotentMarker[A]] = {
@@ -51,16 +51,16 @@ trait ProvidesAvoidRepeats {
           f(key)
           Some(ConcreteDelayedIdempotent(key)) : Option[IdempotentMarker[A]]
         } else {
-          Some(fromCache)
+          None
         }
       }
     }
 
     def apply[A <: Object, B](f: (A,B) => Unit, timeout: Int = 24*60*60, maxSize: Int = 1024): DelayedIdempotentEffect[A,B] = new DelayedIdempotentEffect[A,B] {
-      private val cache: Cache[A,IdempotentMarker[A]] = CacheBuilder.newBuilder().maximumSize(maxSize).expireAfterWrite(timeout, TimeUnit.SECONDS).build()
+      private val cache: Cache[A,A] = CacheBuilder.newBuilder().maximumSize(maxSize).expireAfterWrite(timeout, TimeUnit.SECONDS).build()
 
-      private case class ConcreteDelayedIdempotent(key: A) extends IdempotentMarker[A] { self =>
-        def apply() = cache.put(key, self)
+      private case class ConcreteDelayedIdempotent(key: A) extends IdempotentMarker[A] {
+        def apply() = cache.put(key, key)
       }
 
       def apply(key: A, otherArgs: B) = {
