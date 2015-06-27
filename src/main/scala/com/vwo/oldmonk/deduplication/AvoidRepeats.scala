@@ -69,7 +69,7 @@ trait ProvidesAvoidRepeats {
           f(key, otherArgs)
           Some(ConcreteDelayedIdempotent(key)) : Option[IdempotentMarker[A]]
         } else {
-          Some(fromCache)
+          None
         }
       }
     }

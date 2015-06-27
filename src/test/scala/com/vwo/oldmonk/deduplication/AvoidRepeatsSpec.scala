@@ -54,4 +54,16 @@ class AvoidRepeatsSpec extends Properties("AvoidRepeats") {
     ((marker.map(_.key) === Some(x)) :| "Key on marker is correct") &&
     ((cnt === Set(x,y).size) :| "Effect happened before marker used, never after")
   })
+  property("Dedupe delayed returns None when previously run") = forAll( (x: String, xx: Long, y: String, yy: Long) => {
+    var cnt: Int = 0
+    val f = DelayedIdempotentEffect((k:String, other: Long) => {
+      cnt = cnt + 1
+    })
+    val marker1 = f(x, xx)
+    marker1.foreach(x => x())
+    val marker2 = f(x, yy)
+    marker2.foreach(x => x())
+    val marker1Again = f(x, yy)
+    ((marker1.isDefined :| "Marker1 should be defined") && (marker1Again.isEmpty :| "Marker1Again should be empty"))
+  })
 }
