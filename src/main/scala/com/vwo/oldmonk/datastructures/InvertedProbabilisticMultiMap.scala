@@ -16,6 +16,7 @@ class InvertedProbabilisticMultiMap[K,V](expectedInsertions: Int = 1024*1024, fa
   private def newBloomFilter: BloomFilter[K] = BloomFilter.create[K](keyFunnel, expectedInsertions, falsePositiveProbability)
 
   private val allValues: scala.collection.mutable.Set[V] = new scala.collection.mutable.HashSet[V]()
+  def values: Set[V] = allValues.toSet
   private val filterMap: scala.collection.mutable.Buffer[(V,BloomFilter[K])]  = new scala.collection.mutable.ArrayBuffer[(V,BloomFilter[K])]()
 
   private def getFilter(value: V): Option[BloomFilter[K]] = filterMap.find(kv => kv._1 == value).map(_._2)
