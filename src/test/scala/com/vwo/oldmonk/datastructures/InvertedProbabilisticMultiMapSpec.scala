@@ -15,13 +15,13 @@ class InvertedProbabilisticMultiMapSpec extends Properties("InvertedProbabilisti
     def funnel(data: String, into: PrimitiveSink) = into.putBytes(data.getBytes)
   }
 
-  property("add and remove") = forAll( (k: String, v: Long) => {
+  property("add and get") = forAll( (k: String, v: Long) => {
     val mp = new InvertedProbabilisticMultiMap[String,Long](1024, 1e-8)
     mp.add(k,v)
     mp.get(k).map(_ === v) === List(true)
   })
 
-  property("add and remove many") = forAll( (dataExtra: Map[String,Long]) => {
+  property("add and get many") = forAll( (dataExtra: Map[String,Long]) => {
     val mp = new InvertedProbabilisticMultiMap[String,Long](1024, 1e-16)
     val data = dataExtra.toList.filter(kv => kv._1.size > 0)
     data.map(kv => mp.add(kv._1, kv._2) )
