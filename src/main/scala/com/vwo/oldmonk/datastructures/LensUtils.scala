@@ -22,4 +22,37 @@ object LensUtils {
       }
     )
   }
+
+  private implicit class NullToOption[T](val result: T) extends AnyVal {
+    def nullToOption: Option[T] = if (result != null) { Some(result) } else { None }
+  }
+
+  def singletonCachedLens[A,B<:AnyRef,K<:AnyRef](set: (A,B) => A, get: A => B, cacheKey: A => K): Lens[A,B] = {
+    import java.lang.ref.WeakReference
+
+    var keyWeakRef: Option[WeakReference[K]] = None
+    var valueWeakRef: Option[WeakReference[B]] = None
+
+    Lens.lensu[A,B](
+      (a: A, b: B) => {
+        val result = set(a,b)
+        keyWeakRef = Some(new WeakReference(cacheKey(result)))
+        valueWeakRef = Some(new WeakReference(b))
+        result
+      },
+      (a: A) => {
+        val key = cacheKey(a)
+        val cachedResult = for {
+          oldKey <- keyWeakRef.flatMap(r => r.get().nullToOption)
+          oldValue <- if (key eq oldKey) { valueWeakRef.flatMap(r => r.get().nullToOption) } else { None }
+        } yield (oldValue)
+        cachedResult.fold({
+          keyWeakRef = Some(new WeakReference(key))
+          val result = get(a)
+          valueWeakRef = Some(new WeakReference(result))
+          result
+        })(ov => ov)
+      }
+    )
+  }
 }
