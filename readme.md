@@ -9,6 +9,39 @@ The `Set[A]` data type in scala is invariant. A `CovariantSet[A]` is, as you mig
 
 As a result, this means that `member` method essentially has type `Any => Boolean`. That's not quite true - the actual type is `member[B >: A]: B => Boolean`, but `B` must have an `Order[B]` instance.
 
+## LensUtils
+
+Unfortunately, using Lenses can involve a lot of duplicated effort relative to using `lazy val` on an object. To eliminate some of this added work, we provide two
+replacements for the existing scalaz `Lens`, which avoid this effort.
+
+```scala
+def cachedLens[A,B <: AnyRef,K <: AnyRef](set: (A,B) => A, get: A => B, cacheKey: A => K, maxCacheSize: Int = 512, maxCacheDurationSeconds: Int = 10*60)
+```
+
+This method will cache the results of calling `get` using a google guava cache. The key to the cache will be computed via the `cacheKey` argument.
+
+```scala
+def singletonCachedLens[A,B <: AnyRef,K <: AnyRef](set: (A,B) => A, get: A => B, cacheKey: A => K)
+```
+
+This method will cache only the *last* result computed, and the cache will be stored with weak references. Cache equality is computed via
+*memory location equality*, i.e. using `x eq y` rather than `x == y`. The rationale for this is that many times, a single lens will be used
+in a lot of (mostly unrelated) locations in rapid succession. E.g.:
+
+```scala
+val myLens: Lens[Event,P] = LensUtils.singletonCachedLens(...)
+
+def checkEventForP1(event: Event) = if (myLens.get(event) == ...)
+def checkEventForP2(event: Event) = if (myLens.get(event) == ...)
+
+...later...
+
+def processEvent(event: Event) = {
+  if (checkEventForP1(event)) { p1Handler ! event }
+  if (checkEventForP2(event)) { p2Handler ! event }
+}
+```
+
 # Free objects
 
 A free object is a functor together with a natural transformation that preserves it's structure. It can be thought of as the most expansive possible version of that structure, only obeying the minimum laws necessary.
