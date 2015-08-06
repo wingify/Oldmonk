@@ -11,7 +11,7 @@ trait CountMinSketchLike[K] {
   def update(item: K, increment: Long): Unit
 }
 
-private class BasicCountMinSketchImpl[K](val relativeError: Double, val errorProbability: Double, val maxL1Result: Long, hashFunctionConstructor: Int => HashFunction = x => Hashing.murmur3_128(x))(implicit funnel: Funnel[K]) {
+class BasicCountMinSketchImpl[K](val relativeError: Double, val errorProbability: Double, val maxL1Result: Long, hashFunctionConstructor: Int => HashFunction = x => Hashing.murmur3_128(x))(implicit funnel: Funnel[K]) {
   //SHOULD NEVER BE USED OUTSIDE
   import java.lang.Math
   val depth = Math.ceil(-1*Math.log(errorProbability)).toInt
