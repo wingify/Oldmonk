@@ -2,6 +2,7 @@ package com.vwo.oldmonk.deduplication
 
 import com.google.common.cache._
 import java.util.concurrent.TimeUnit
+import com.google.common.hash._
 
 trait ProvidesAvoidRepeats {
 
@@ -20,6 +21,34 @@ trait ProvidesAvoidRepeats {
         }
         ()
       }
+    }
+  }
+
+  class BloomFilterIdempotentEffect[A](f: A => Unit, insertionsBeforeRotate: Int = 1024*1024, falsePositiveProbability: Double = 1e-12)(implicit funnel: Funnel[A]) extends IdempotentEffect[A] {
+    /* Note that this class is single-threaded.
+     * However, it provides far better memory usage than IdempotentEffect.
+     */
+
+    private var mainFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
+    private var oldFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
+    private var numInsertions: Int = 0
+
+    private def add(key: A) = {
+      mainFilter.put(key)
+      numInsertions += 1
+      if (numInsertions > insertionsBeforeRotate) {
+        oldFilter = mainFilter
+        mainFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
+        numInsertions = 0
+      }
+    }
+
+    def apply(key: A): Unit = {
+      if (!mainFilter.mightContain(key) && !oldFilter.mightContain(key)) {
+        f(key)
+        add(key)
+      }
+      ()
     }
   }
 

@@ -3,15 +3,17 @@ package com.vwo.oldmonk.deduplication
 import org.scalacheck._
 import org.scalacheck.Arbitrary.arbitrary
 import Prop._
+import com.google.common.hash._
 
 import scalaz._
 import Scalaz._
 
-class AvoidRepeatsSpec extends Properties("AvoidRepeats") {
+abstract class IdempotentEffectGenericSpec(name: String) extends Properties(name) {
+  def newEffect(f: String => Unit): IdempotentEffect[String]
 
   property("Dedupe effects") = forAll( (x: String) => {
     var cnt: Int = 0
-    val f = IdempotentEffect((k:String) => {
+    val f = newEffect((k:String) => {
       cnt = cnt + 1
     })
     f(x)
@@ -21,7 +23,7 @@ class AvoidRepeatsSpec extends Properties("AvoidRepeats") {
 
   property("Dedupe effects pt 2") = forAll( (x: String, y: String) => {
     var cnt: Int = 0
-    val f = IdempotentEffect((k:String) => {
+    val f = newEffect((k:String) => {
       cnt = cnt + 1
     })
     f(x)
@@ -29,7 +31,57 @@ class AvoidRepeatsSpec extends Properties("AvoidRepeats") {
     f(y)
     cnt === Set(x,y).size
   })
+}
 
+class IdempotentEffectSpec extends IdempotentEffectGenericSpec("IdempotentEffectSpec") {
+  def newEffect(f: String => Unit): IdempotentEffect[String] = IdempotentEffect(f)
+}
+
+class BloomFilterIdempotentEffectSpec extends IdempotentEffectGenericSpec("BloomFilterIdempotentEffectSpec") {
+  implicit val stringFunnel = new Funnel[String] {
+    def funnel(data: String, into: PrimitiveSink) = into.putBytes(data.getBytes)
+  }
+
+  def newEffect(f: String => Unit): IdempotentEffect[String] = new BloomFilterIdempotentEffect(f, insertionsBeforeRotate = 100)
+
+  property("Dedupe works after rotate") = forAll( (x: String) => {
+    var cnt: Int = 0
+    val f = newEffect((k:String) => {
+      cnt = cnt + 1
+    })
+    var i=0
+    while (i < 150) {
+      f(x + i)
+      i += 1
+    }
+    i = 0
+    while (i < 150) {
+      f(x + i)
+      i += 1
+    }
+    cnt === 150
+  })
+
+  property("Rotations occur, after 2 rotates dedupe should fail") = forAll( (x: String) => {
+    var cnt: Int = 0
+    val f = newEffect((k:String) => {
+      cnt = cnt + 1
+    })
+    var i=0
+    while (i < 300) {
+      f(x + i)
+      i += 1
+    }
+    i = 0
+    while (i < 100) {
+      f(x + i)
+      i += 1
+    }
+    cnt === 400
+  })
+}
+
+class DelayedIdempotentEffectSpec extends Properties("DelayedIdempotentEffectSpec") {
   property("Dedupe delayed effects") = forAll( (x: String, xx: Long, xxx: Long, xxxx: Long) => {
     var cnt: Int = 0
     val f = DelayedIdempotentEffect((k:String, other: Long) => {
