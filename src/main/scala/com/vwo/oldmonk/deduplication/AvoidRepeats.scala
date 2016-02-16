@@ -1,5 +1,7 @@
 package com.vwo.oldmonk.deduplication
 
+import com.vwo.oldmonk.datastructures.RotatingBloomFilter
+
 import com.google.common.cache._
 import java.util.concurrent.TimeUnit
 import com.google.common.hash._
@@ -29,24 +31,12 @@ trait ProvidesAvoidRepeats {
      * However, it provides far better memory usage than IdempotentEffect.
      */
 
-    private var mainFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
-    private var oldFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
-    private var numInsertions: Int = 0
-
-    private def add(key: A) = {
-      mainFilter.put(key)
-      numInsertions += 1
-      if (numInsertions > insertionsBeforeRotate) {
-        oldFilter = mainFilter
-        mainFilter = BloomFilter.create[A](funnel, insertionsBeforeRotate, falsePositiveProbability)
-        numInsertions = 0
-      }
-    }
+    private val bf = new RotatingBloomFilter(insertionsBeforeRotate, falsePositiveProbability)
 
     def apply(key: A): Unit = {
-      if (!mainFilter.mightContain(key) && !oldFilter.mightContain(key)) {
+      if (!bf.mightContain(key)) {
         f(key)
-        add(key)
+        bf.add(key)
       }
       ()
     }
