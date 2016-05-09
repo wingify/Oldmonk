@@ -52,6 +52,9 @@ class TimedRotatingBloomFilter[A](insertionsBeforeRotate: Int = 1024*1024, false
   private def rotateByTime = {
     if (System.currentTimeMillis > lastRotateTime + rotateTimeMillis) {
       rotate
+      rotate
+    } else if (System.currentTimeMillis > lastRotateTime + rotateTimeMillis) {
+      rotate
     }
   }
 
