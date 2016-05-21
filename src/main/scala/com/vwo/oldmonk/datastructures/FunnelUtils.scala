@@ -2,7 +2,16 @@ package com.vwo.oldmonk.datastructures
 
 import com.google.common.hash._
 
-object FunnelUtils {
+trait FunnelUtils {
+  implicit def CharSequenceFunnel: Funnel[CharSequence] = Funnels.unencodedCharsFunnel()
+  implicit def ByteArrayFunnel: Funnel[Array[Byte]] = Funnels.byteArrayFunnel()
+  implicit def IntFunnel: Funnel[Int] = new Funnel[Int] {
+    def funnel(t: Int, sink: PrimitiveSink) = sink.putInt(t)
+  }
+  implicit def LongFunnel: Funnel[Long] = new Funnel[Long] {
+    def funnel(t: Long, sink: PrimitiveSink) = sink.putLong(t)
+  }
+
   implicit def tuple2Funnel[A,B](implicit funnelA: Funnel[A], funnelB: Funnel[B]) = new Funnel[(A,B)] {
     def	funnel(from: (A,B), into: PrimitiveSink) = {
       funnelA.funnel(from._1, into)
