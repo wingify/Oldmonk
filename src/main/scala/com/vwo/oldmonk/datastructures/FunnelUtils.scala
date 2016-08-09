@@ -45,4 +45,15 @@ trait FunnelUtils {
       funnelE.funnel(from._5, into)
     }
   }
+
+  implicit object UUIDFunnel extends Funnel[java.util.UUID] {
+    def funnel(uuid: java.util.UUID, into: PrimitiveSink) = {
+      into.putLong(uuid.getLeastSignificantBits())
+      into.putLong(uuid.getMostSignificantBits())
+    }
+  }
+
+  implicit object BooleanFunnel extends Funnel[Boolean] {
+    def funnel(b: Boolean, into: PrimitiveSink) = into.putBoolean(b)
+  }
 }
