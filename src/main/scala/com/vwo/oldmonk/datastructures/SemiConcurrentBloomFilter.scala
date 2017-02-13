@@ -4,7 +4,7 @@ import com.google.common.hash._
 import com.google.common.base.Predicate
 
 import java.util.concurrent.atomic._
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 class SemiConcurrentBloomFilter[A](filterSize: Int = 1024*1024, falsePositiveProbability: Double = 1e-12, insertionsBeforeCompact: Int = 1024)(implicit funnel: Funnel[A]) {
   /*
@@ -43,7 +43,7 @@ class SemiConcurrentBloomFilter[A](filterSize: Int = 1024*1024, falsePositivePro
   def maybeCompact: Unit = {
     attemptedCompactions.incrementAndGet()
     val size = newValues.size()
-    val toAdd: Seq[A] = newValues.keys().take(size).toSeq //We restrict the size to ensure that we don't sit in an infinite loop here
+    val toAdd: Seq[A] = newValues.keys().asScala.take(size).toSeq //We restrict the size to ensure that we don't sit in an infinite loop here
     val oldBf = mainFilter.get()
     val newBf = oldBf.copy()
     toAdd.foreach(newBf.put _)

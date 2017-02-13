@@ -8,7 +8,8 @@ object ApplicationBuild extends Build {
   lazy val commonSettings = Defaults.defaultSettings ++ Seq(
     organization := "com.vwo",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-    scalaVersion := "2.11.7",
+    scalaVersion := "2.12.1",
+    crossScalaVersions := Seq("2.12.1", "2.11.7"),
     version := "0.01." + "git rev-parse HEAD".!!.trim,
     resolvers ++= myResolvers,
     scalacOptions := Seq("-deprecation"),
@@ -51,11 +52,11 @@ object ApplicationBuild extends Build {
   )
 
   object Dependencies {
-    val scalaz           = "org.scalaz"            %% "scalaz-core"               % "7.1.2"
+    val scalaz           = "org.scalaz"            %% "scalaz-core"               % "7.2.7"
     val guava            = "com.google.guava"      % "guava"                      % "18.0"
-    val spire            = "org.spire-math"        %% "spire"                     % "0.9.1"
+    val spire            = "org.spire-math"        %% "spire"                     % "0.13.0"
 
-    val scalaCheck       = "org.scalacheck"        %% "scalacheck"                % "1.12.2" % "test"
+    val scalaCheck       = "org.scalacheck"        %% "scalacheck"                % "1.13.4" % "test"
 
     val all = Seq(scalaz, guava, spire, scalaCheck)
   }
