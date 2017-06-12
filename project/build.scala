@@ -53,8 +53,8 @@ object ApplicationBuild extends Build {
 
   object Dependencies {
     val scalaz           = "org.scalaz"            %% "scalaz-core"               % "7.2.7"
-    val guava            = "com.google.guava"      % "guava"                      % "18.0"
-    val spire            = "org.spire-math"        %% "spire"                     % "0.13.0"
+    val guava            = "com.google.guava"      %  "guava"                     % "18.0"
+    val spire            = "org.typelevel"         %% "spire"                     % "0.14.1"
 
     val scalaCheck       = "org.scalacheck"        %% "scalacheck"                % "1.13.4" % "test"
 
