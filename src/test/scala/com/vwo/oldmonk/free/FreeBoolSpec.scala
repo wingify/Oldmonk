@@ -28,12 +28,6 @@ abstract class FreeBoolSpec(prop: String) extends Properties(prop) {
     fbl.nat(f)(fbl.bool[String])(x.point[FreeBool]) == f(x)
   })
 
-  property("nat works if we map to booleans") = forAll( (x: Int, y: Int) => {
-    val pred = x.point[FreeBool] & y.point[FreeBool]
-    def f(t: Int) = (t % 3 == 0)
-    fbl.nat(f)(implicitly[Bool[Boolean]])(pred) == (f(x) && f(y))
-  })
-
   property("nat commutes with &") = forAll( (x: Int, y: Int) => {
     def f(t: Int) = t.toString.point[FreeBool]
     fbl.nat(f)(fbl.bool[String])(x.point[FreeBool] & y.point[FreeBool]) == (f(x) & f(y))
@@ -47,6 +41,18 @@ abstract class FreeBoolSpec(prop: String) extends Properties(prop) {
   property("nat commutes with ~") = forAll( (x: Int) => {
     def f(t: Int) = t.toString.point[FreeBool]
     fbl.nat(f)(fbl.bool[String])(~x.point[FreeBool]) == (~f(x))
+  })
+
+  property("nat works if we map to booleans pt1") = forAll( (x: Int, y: Int) => {
+    val pred = x.point[FreeBool] & y.point[FreeBool]
+    def f(t: Int) = (t % 3 == 0)
+    fbl.nat(f)(implicitly[Bool[Boolean]])(pred) == (f(x) && f(y))
+  })
+
+  property("nat works if we map to booleans pt2") = forAll( (x: Int, y: Int, z: Int) => {
+    val pred = (x.point[FreeBool] & y.point[FreeBool]) | z.point[FreeBool]
+    def f(t: Int) = (t % 3 == 0)
+    fbl.nat(f)(implicitly[Bool[Boolean]])(pred) == ((f(x) && f(y)) | f(z))
   })
 }
 
