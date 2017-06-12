@@ -19,6 +19,7 @@ trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F]
   override def map[A, B](fa: F[A])(f: A => B): F[B] = nat((a:A) => point[B](f(a)))(bool[B])(fa)
   def bind[A,B](fa: F[A])(f: A => F[B]): F[B] = nat((a:A) => f(a))(bool[B])(fa)
 
+
   implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new ConcreteFreeBoolAlgebra[A,F] {
     protected val bool = FreeBoolAlgebra.this.bool[A]
     def nat[B](f: A=>B)(implicit ba: Bool[B]) = FreeBoolAlgebra.this.nat[A,B](f)
@@ -38,15 +39,15 @@ trait ConcreteFreeBoolAlgebra[A, F[_]] extends Bool[F[A]] {
   def nat[B](f: A => B)(implicit ba: Bool[B]): F[A] => B
 }
 
-trait FreeBoolSyntax {
-  def truePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.one
-  def falsePred[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]): F[P] = a.zero
-  def andPred[P, F[_]](terms: Seq[F[P]])(implicit a: ConcreteFreeBoolAlgebra[P,F]) = terms.headOption.map(h =>
+private class FreeBoolUtil[P, F[_]](implicit a: ConcreteFreeBoolAlgebra[P,F]) {
+  val truePred: F[P] = a.one
+  val falsePred: F[P] = a.zero
+  def andPred(terms: Seq[F[P]]) = terms.headOption.map(h =>
     terms.tail.foldLeft(h)( (x: F[P],y: F[P]) => x & y)
   ).getOrElse(a.one)
-  def andPred[P, F[_]](fst: F[P], ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x & y)
-  def orPred[P, F[_]](fst: F[P], ps: F[P]*)(implicit a: ConcreteFreeBoolAlgebra[P,F]) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x | y)
-  def orPred[P, F[_]](terms: Seq[F[P]])(implicit a: ConcreteFreeBoolAlgebra[P,F]) = terms.headOption.map(h =>
+  def andPred(fst: F[P], ps: F[P]*) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x & y)
+  def orPred(fst: F[P], ps: F[P]*) = ps.foldLeft(fst)( (x: F[P],y: F[P]) => x | y)
+  def orPred(terms: Seq[F[P]]) = terms.headOption.map(h =>
     terms.tail.foldLeft(h)( (x: F[P],y: F[P]) => x | y)
   ).getOrElse(a.zero)
 }
@@ -82,30 +83,45 @@ trait FreeBoolListInstances {
   object FreeBoolListAlgebra extends FreeBoolAlgebra[FreeBoolList] {
     def point[P](p: =>P): FreeBoolList[P] = Pred(p)
 
-    def traverseImpl[G[_], A, B](fa: FreeBoolList[A])(f: A => G[B])(implicit ap: Applicative[G]): G[FreeBoolList[B]] = fa match {
-      case Pred(u) => f(u).map(x => point[B](x))
-      case Negate(term) => traverseImpl(term)(f).map(x => ~x)
-      case (x:ConstantFreeBoolList) => (x:FreeBoolList[B]).point[G]
-      case AndPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => andPred(tt))
-      case OrPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => orPred(tt))
+    def traverseImpl[G[_], A, B](fa: FreeBoolList[A])(f: A => G[B])(implicit ap: Applicative[G]): G[FreeBoolList[B]] = traverseImplMaterialized(fa)(f)(ap, new FreeBoolUtil[B,FreeBoolList])
+
+    private def traverseImplMaterialized[G[_], A, B](fa: FreeBoolList[A])(f: A => G[B])(implicit ap: Applicative[G], syntax: FreeBoolUtil[B,FreeBoolList]): G[FreeBoolList[B]] = {
+      import syntax._
+      fa match {
+        case Pred(u) => f(u).map(x => point[B](x))
+        case Negate(term) => traverseImpl(term)(f).map(x => ~x)
+        case (x:ConstantFreeBoolList) => (x:FreeBoolList[B]).point[G]
+        case AndPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => andPred(tt))
+        case OrPred(terms) => terms.traverse(x => traverseImpl(x)(f)).map(tt => orPred(tt))
+      }
     }
 
-    override def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = fa match {
-      case TruePred => TruePred
-      case FalsePred => FalsePred
-      case Pred(x) => f(x)
-      case Negate(x) => ~(bind(x)(f))
-      case AndPred(terms) => andPred(terms.map(t => bind(t)(f)))
-      case OrPred(terms) => orPred(terms.map(t => bind(t)(f)))
+    override def bind[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B]): FreeBoolList[B] = bindMaterialized(fa)(f)(new FreeBoolUtil[B,FreeBoolList])
+
+    private def bindMaterialized[A, B](fa: FreeBoolList[A])(f: A => FreeBoolList[B])(implicit syntax: FreeBoolUtil[B,FreeBoolList]): FreeBoolList[B] = {
+      import syntax._
+      fa match {
+        case TruePred => TruePred
+        case FalsePred => FalsePred
+        case Pred(x) => f(x)
+        case Negate(x) => ~(bind(x)(f))
+        case AndPred(terms) => andPred(terms.map(t => bind(t)(f)))
+        case OrPred(terms) => orPred(terms.map(t => bind(t)(f)))
+      }
     }
 
-    override def map[A, B](fa: FreeBoolList[A])(f: A => B): FreeBoolList[B] = fa match {
-      case TruePred => TruePred
-      case FalsePred => FalsePred
-      case Pred(x) => Pred(f(x))
-      case Negate(x) => ~(map(x)(f))
-      case AndPred(terms) => andPred(terms.map(t => map(t)(f)))
-      case OrPred(terms) => orPred(terms.map(t => map(t)(f)))
+    override def map[A, B](fa: FreeBoolList[A])(f: A => B): FreeBoolList[B] = mapMaterialized(fa)(f)(new FreeBoolUtil[B,FreeBoolList])
+
+    private def mapMaterialized[A,B](fa: FreeBoolList[A])(f: A => B)(implicit syntax: FreeBoolUtil[B,FreeBoolList]): FreeBoolList[B] = {
+      import syntax._
+      fa match {
+        case TruePred => TruePred
+        case FalsePred => FalsePred
+        case Pred(x) => Pred(f(x))
+        case Negate(x) => ~(map(x)(f))
+        case AndPred(terms) => andPred(terms.map(t => map(t)(f)))
+        case OrPred(terms) => orPred(terms.map(t => map(t)(f)))
+      }
     }
 
     def bool[P] = new Bool[FreeBoolList[P]] {
@@ -143,8 +159,16 @@ trait FreeBoolListInstances {
       def homo(a: FreeBoolList[A]): B = a match {
         case Pred(x) => f(x)
         case Negate(x) => ba.complement(homo(x))
-        case AndPred(terms) => terms.foldLeft(ba.one)( (x:B,y:FreeBoolList[A]) => ba.and(x, homo(y)) )
-        case OrPred(terms) => terms.foldLeft(ba.zero)( (x:B,y:FreeBoolList[A]) => ba.or(x, homo(y)) )
+        case AndPred(terms) => terms match {
+          case (Nil) => ba.one
+          case (h :: Nil) => homo(h)
+          case (h :: t) => t.foldLeft(homo(h))( (x:B,y:FreeBoolList[A]) => ba.and(x, homo(y)) )
+        }
+        case OrPred(terms) => terms match {
+          case (Nil) => ba.zero
+          case (h :: Nil) => homo(h)
+          case (h :: t) => t.foldLeft(homo(h))( (x:B,y:FreeBoolList[A]) => ba.or(x, homo(y)) )
+        }
         case TruePred => ba.one
         case FalsePred => ba.zero
       }
