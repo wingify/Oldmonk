@@ -54,6 +54,18 @@ abstract class FreeBoolSpec(prop: String) extends Properties(prop) {
     def f(t: Int) = (t % 3 == 0)
     fbl.nat(f)(implicitly[Bool[Boolean]])(pred) == ((f(x) && f(y)) | f(z))
   })
+
+  property("Fold works") = forAll( (x: Int, y: Int, z: Int) => {
+    val pred = (x.point[FreeBool] & y.point[FreeBool]) | z.point[FreeBool]
+    val folded = fbl.foldFreeBool[Int,String](pred)(
+      x => x.toString,
+      aa => "(" + aa.reduce((a1, a2) => a1 + " && " + a2) + ")",
+      aa => "(" + aa.reduce((a1, a2) => a1 + " || " + a2) + ")",
+      a => "!" + a,
+      "true",
+      "false")
+    folded == "((" + x + " && " + y + ") || " + z + ")"
+  })
 }
 
 class FreeBoolListSpec extends FreeBoolSpec("FreeBoolListSpec") {

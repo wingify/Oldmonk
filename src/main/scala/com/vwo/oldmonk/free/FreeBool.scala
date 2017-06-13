@@ -20,6 +20,11 @@ trait FreeBoolAlgebra[F[_]] extends Applicative[F] with Functor[F] with Monad[F]
   def bind[A,B](fa: F[A])(f: A => F[B]): F[B] = nat((a:A) => f(a))(bool[B])(fa)
 
 
+  def foldFunc[A,B](f: A => B, andHandler: List[B] => B, orHandler: List[B] => B, notHandler: B => B, trueVal: B, falseVal: B): F[A] => B
+
+  def foldFreeBool[A,B](fa: F[A])(f: A => B, andHandler: List[B] => B, orHandler: List[B] => B, notHandler: B => B, trueVal: B, falseVal: B): B =
+    foldFunc(f, andHandler, orHandler, notHandler, trueVal, falseVal)(fa)
+
   implicit def concrete[A]: ConcreteFreeBoolAlgebra[A,F] = new ConcreteFreeBoolAlgebra[A,F] {
     protected val bool = FreeBoolAlgebra.this.bool[A]
     def nat[B](f: A=>B)(implicit ba: Bool[B]) = FreeBoolAlgebra.this.nat[A,B](f)
@@ -124,6 +129,18 @@ trait FreeBoolListInstances {
       }
     }
 
+    def foldFunc[A,B](f: A => B, andHandler: List[B] => B, orHandler: List[B] => B, notHandler: B => B, trueVal: B, falseVal: B): (FreeBoolList[A] => B) = {
+      def folder(fa: FreeBoolList[A]): B = fa match {
+        case TruePred => trueVal
+        case FalsePred => falseVal
+        case Pred(a) => f(a)
+        case AndPred(aa) => andHandler(aa.map(folder))
+        case OrPred(aa) => orHandler(aa.map(folder))
+        case Negate(a) => notHandler(folder(a))
+      }
+      folder _
+    }
+
     def bool[P] = new Bool[FreeBoolList[P]] {
       def and(a: FreeBoolList[P], b: FreeBoolList[P]) = (a,b) match {
         case (FalsePred, _) => FalsePred
@@ -174,6 +191,10 @@ trait FreeBoolListInstances {
       }
       homo
     }
+
+  implicit class FreeBoolListMethods2[A](a: FreeBoolList[A]) {
+    def foldFreeBool[B](f: A => B, andHandler: List[B] => B, orHandler: List[B] => B, notHandler: B => B, trueVal: B, falseVal: B) = FreeBoolListAlgebra.foldFreeBool(a)(f, andHandler, orHandler, notHandler, trueVal, falseVal)
+  }
   }
 }
 
